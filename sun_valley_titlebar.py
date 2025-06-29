@@ -65,7 +65,6 @@ def Titlebar(
             )
 
         root.hwnd = windll.user32.GetParent(root.winfo_id())
-        print(root.hwnd)
 
         old, new = "old", "new"
         prototype = WINFUNCTYPE(c_uint64, c_uint64, c_uint64, c_uint64, c_uint64)
