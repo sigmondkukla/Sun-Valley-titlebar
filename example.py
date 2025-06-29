@@ -8,7 +8,6 @@ WINDOW_MINSIZE = (400, 400)
 WINDOW_POSITION = (100, 100) # Make sure to set a decent starting position, otherwise the window will be placed at the top left of the screen
 
 root = tk.Tk()
-root.overrideredirect(True) # Make sure that overrideredirect is set to True
 
 # Set window parameters
 root.minsize(WINDOW_MINSIZE[0], WINDOW_MINSIZE[1])
@@ -28,16 +27,9 @@ icon = tk.PhotoImage(file='feather.gif')
 def change_theme():
     if root.tk.call("ttk::style", "theme", "use") == "sun-valley-dark":
         root.tk.call("set_theme", "light")
-        windll.dwmapi.DwmSetWindowAttribute(windll.user32.GetParent( root.winfo_id()), 20, byref(c_int(0)), sizeof(c_int(0)))
-        root.update()
-        root.withdraw()
-        root.deiconify()
     else:
         root.tk.call("set_theme", "dark")
-        windll.dwmapi.DwmSetWindowAttribute(windll.user32.GetParent( root.winfo_id()), 20, byref(c_int(2)), sizeof(c_int(2)))
-        root.update()
-        root.withdraw()
-        root.deiconify()
+
 
 # Create the content frame
 big_frame = ttk.Frame(root)

@@ -1,15 +1,9 @@
 import tkinter as tk
 from tkinter import ttk
-from ctypes import windll
-from pathlib import Path
+from ctypes import WINFUNCTYPE, c_uint64, windll
+from platform import win32_ver
+from data import *
 
-env = Path(__file__).parent
-try:
-	plugin = windll.LoadLibrary(str(env / "plugin64.dll"))
-except OSError:
-	plugin = windll.LoadLibrary(str(env / "plugin32.dll"))
-except:
-	pass
 
 def Titlebar(root, main_frame, icon, title_text, minimize, maximize, close, min_width, min_height):
     #region Docstring
@@ -31,65 +25,68 @@ def Titlebar(root, main_frame, icon, title_text, minimize, maximize, close, min_
     root.minimized = False # only to know if root is minimized
     root.maximized = False # only to know if root is maximized
 
-    # Create a frame for the titlebar
-    title_bar = ttk.Frame(root)
-
     # Window manager functions
     def minimize_window():
-        root.attributes("-alpha",0)
-        root.minimized = True       
+        """Minimize the window"""
+        root.iconify()
+        root.minimized = True
 
     def deminimize(event):
-        root.focus() 
-        root.attributes("-alpha",1)
+        """Deminimize the window"""
+        root.focus()
         if root.minimized == True:
-            root.minimized = False                              
+            root.minimized = False
 
     def maximize_window():
+        """Maximize the window"""
         if root.maximized == False:
-            root.normal_size = root.geometry()
             expand_button.config(text=" 🗗 ")
-            root.geometry(f"{root.winfo_screenwidth()}x{root.winfo_screenheight()}+0+0")
+            windll.user32.ShowWindow(root.hwnd, SW_MAXIMIZE)
         else:
             expand_button.config(text=" 🗖 ")
-            root.geometry(root.normal_size)
+            windll.user32.ShowWindow(root.hwnd, SW_NORMAL, 0, 0)
 
         root.maximized = not root.maximized
 
-    def set_appwindow(mainWindow):
-        global hwnd
-        hwnd = windll.user32.GetParent(mainWindow.winfo_id())
-        plugin.setwindow(hwnd)
-        mainWindow.wm_withdraw()
-        mainWindow.after(10, lambda: mainWindow.wm_deiconify())
+    def setup(root):
+        """Setup"""
+        def WndProc(hwnd, msg, wp, lp):
+            """Handle the messages"""
+            if msg == WM_NCCALCSIZE and wp:
+                lpncsp = NCCALCSIZE_PARAMS.from_address(lp)
+                lpncsp.rgrc[0].top -= root.titlebarheight
 
-    def get_pos(event):
+            return windll.user32.CallWindowProcW(*map(c_uint64, (globals()[old], hwnd, msg, wp, lp)))
+
+        root.hwnd = windll.user32.GetParent(root.winfo_id())
+        print(root.hwnd)
+
+        old, new = "old", "new"
+        prototype = WINFUNCTYPE(c_uint64, c_uint64, c_uint64, c_uint64, c_uint64)
+
+        globals()[old] = None
+        globals()[new] = prototype(WndProc)
+        globals()[old] = windll.user32.GetWindowLongPtrA(root.hwnd, GWL_WNDPROC)
+        windll.user32.SetWindowLongPtrW(root.hwnd, GWL_WNDPROC, globals()[new])
+
+        windll.user32.SetWindowPos(root.hwnd, None, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_FRAMECHANGED)
+
+    def moving(event):
+        """Rewrite the moving of the window"""
         if root.maximized == False:
-            def move_window(event): # runs when window is dragged
-                root.config(cursor="fleur")
-                global x, y, hwnd
-                try:
-                    plugin.move(hwnd, root.winfo_x(), root.winfo_y(), event.x - x, event.y - y) # Use C for speed
-                except:
-                    pass
+            windll.user32.ReleaseCapture()
+            windll.user32.SendMessageA(root.hwnd, WM_SYSCOMMAND, SC_MOVE + HTCAPTION, 0)
 
-            def release_window(event): # runs when window is released
-                root.config(cursor="arrow")
-                
-            def drag_titlebar(event):
-                global x, y
-                x = event.x
-                y = event.y
-                
-            title_bar.bind('<B1-Motion>', move_window)
-            title_bar.bind('<ButtonRelease-1>', release_window)
-            title_bar.bind("<ButtonPress-1>", drag_titlebar)
-            title_bar_title.bind('<B1-Motion>', move_window)
-            title_bar_title.bind('<ButtonRelease-1>', release_window)
-            title_bar_title.bind("<ButtonPress-1>", drag_titlebar)
         else:
             expand_button.config(text=" 🗖 ")
             root.maximized = not root.maximized
+
+    def get_window_titlebar_height(root) -> None:
+        """Get the correct titlebar hegiht via system version"""
+        root.titlebarheight = root.winfo_rooty() - root.winfo_y() - (1 if "11" == win32_ver()[0] else 0)
+
+    # Create a frame for the titlebar
+    title_bar = ttk.Frame(root)
 
     # Pack the title bar window
     title_bar.pack(fill=tk.X)
@@ -115,12 +112,14 @@ def Titlebar(root, main_frame, icon, title_text, minimize, maximize, close, min_
     title_bar_title.pack(side=tk.LEFT, padx=(10,0))
 
     # Bind events for moving the title bar
-    title_bar.bind('<Button-1>', get_pos)
-    title_bar_title.bind('<Button-1>', get_pos)
+    title_bar.bind("<B1-Motion>", moving)
 
     # Set up the window for minimizing functionality
     root.bind("<FocusIn>",deminimize)
-    root.after(10, lambda: set_appwindow(root))
+    root.iconbitmap("")
+    get_window_titlebar_height(root)
+
+    setup(root)
 
 # Menubar class creates a frame for the menubar which is accessed in the Menu class
 class Menubar:
@@ -138,8 +137,10 @@ class Menu:
         self.menubutton.pack(side=tk.LEFT, padx=(10,0))
 
     def add_command(self, label, command=None):
+        """..."""
         if command != None: self.menu.add_command(label=label, command=command)
         else: self.menu.add_command(label=label)
 
     def add_separator(self):
+        """..."""
         self.menu.add_separator()
