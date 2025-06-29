@@ -17,5 +17,6 @@ SW_NORMAL = 1
 
 GWL_WNDPROC = -4
 
+
 class NCCALCSIZE_PARAMS(Structure):
     _fields_ = [("rgrc", RECT * 3), ("lppos", POINT)]
